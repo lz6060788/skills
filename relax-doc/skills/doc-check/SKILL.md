@@ -1,12 +1,9 @@
+---
+name: doc-check
+description: 渐进式语义分析 skill，执行两阶段过滤（路径匹配 → 语义匹配）来判断代码变更对文档的影响。当需要分析代码变更对文档的影响、分析 git diff 对文档的冲击时使用。
+---
+
 # doc-check
-
-## name
-
-doc-check
-
-## description
-
-渐进式语义分析 skill，执行两阶段过滤（路径匹配 → 语义匹配）来判断代码变更对文档的影响。当需要分析代码变更对文档的影响、分析 git diff 对文档的冲击时使用。
 
 ## body
 

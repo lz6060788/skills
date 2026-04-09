@@ -1,10 +1,9 @@
-# doc-update Skill
+---
+name: doc-update
+description: 最小上下文文档更新 skill，执行 patch 级修改。当需要更新文档、对文档进行增量修改、根据代码变更调整文档内容时使用。
+---
 
-## Name
-doc-update
-
-## Description
-最小上下文文档更新 skill，执行 patch 级修改。当需要更新文档、对文档进行增量修改、根据代码变更调整文档内容时使用。
+# doc-update
 
 ## Core Principles
 doc.update = single document, minimal context, patch-level modification

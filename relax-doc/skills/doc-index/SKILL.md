@@ -1,8 +1,9 @@
+---
+name: doc-index
+description: 索引系统维护 skill，维护 graph.json 和 index.md。当需要：(1) 构建或更新索引，(2) 查询文档状态，(3) 维护文档与代码的映射关系时使用。
+---
+
 # Skill: doc-index
-
-**name:** doc-index
-
-**description:** "索引系统维护 skill，维护 graph.json 和 index.md。当需要：(1) 构建或更新索引，(2) 查询文档状态，(3) 维护文档与代码的映射关系时使用。"
 
 ## Overview
 
