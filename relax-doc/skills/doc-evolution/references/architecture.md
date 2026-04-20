@@ -33,6 +33,29 @@ doc.update      建议 doc.gen     忽略           doc.index
 [doc.index] (状态更新) ←─────────────────────────┘
 ```
 
+### Git-History Batch Sync Flow
+
+```text
+"doc-evolution --sync"
+    ↓
+Read _meta.lastDocSyncRef from graph.json
+    ↓ (fallback: git log -1 -- docs/)
+git diff <ref>..HEAD -- ':(exclude)docs/**'
+    ↓
+┌─────────────┐
+│ Empty diff? │──YES──→ Report "no changes", exit
+└──────┬──────┘
+       NO
+       ↓
+[doc.check] (two-phase analysis)
+       ↓
+Process by certainty (high→update, medium→recommend)
+       ↓
+[doc.index] (refresh signatures)
+       ↓
+Write _meta.lastDocSyncRef = HEAD hash
+```
+
 ## 四者关系
 
 | Skill | 职责 | 触发条件 |
@@ -48,9 +71,8 @@ doc.update      建议 doc.gen     忽略           doc.index
 
 ```bash
 /docs
-  /_index
-    index.md
-    graph.json
+  graph.json          # 机器可读索引（直接放在 docs/ 下，不建子目录）
+  index.md            # 人类可读状态报告（与 graph.json 同级）
 
   /design
     /modules/{module}/index.md
@@ -74,12 +96,15 @@ doc.update      建议 doc.gen     忽略           doc.index
 
 ---
 
-## 核心数据模型 (graph.json)
+## 核心数据模型 (docs/graph.json)
 
 ### 完整结构
 
 ```json
 {
+  "_meta": {
+    "lastDocSyncRef": "9f2ca690b41e11c3"
+  },
   "auth": {
     "code_paths": ["src/modules/auth/**"],
     "module_summary": "Authentication subsystem responsible for identity verification, token lifecycle, and OAuth integration.",
@@ -108,6 +133,18 @@ doc.update      建议 doc.gen     忽略           doc.index
 | code_paths | 硬过滤 |
 | module_summary | 模块级语义匹配 |
 | doc.summary | 文档级精细匹配 |
+
+### Sync Reference 管理
+
+`_meta.lastDocSyncRef` 是 `graph.json` 中的顶层元数据字段，用于记录文档最后一次同步的 git commit。
+
+| 属性 | 值 |
+|---|---|
+| 字段路径 | `_meta.lastDocSyncRef` |
+| 格式 | 16 字符 short git hash |
+| 更新时机 | doc-sync 完成后 / index 完整重建后 |
+| 回退策略 | 缺失/无效时用 `git log --format="%H" -1 -- docs/` |
+| 验证方式 | `git cat-file -t <ref>` 确认是有效 commit |
 
 ### summary 写作规范 (强约束)
 

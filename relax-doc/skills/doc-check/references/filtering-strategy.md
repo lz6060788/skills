@@ -6,11 +6,11 @@ The filtering strategy is the core of the doc-check skill's efficiency. It imple
 
 ## The Three-Layer Semantic Structure
 
-Before diving into the filtering levels, it is important to understand the three-layer semantic structure that underlies the graph.json data model:
+Before diving into the filtering levels, it is important to understand the three-layer semantic structure that underlies the `docs/graph.json` data model:
 
 | Layer | Purpose | Data Source |
 |-------|---------|-------------|
-| code_paths | Hard filtering - definitive path-based inclusion/exclusion | glob patterns in graph.json |
+| code_paths | Hard filtering - definitive path-based inclusion/exclusion | glob patterns in `docs/graph.json` |
 | module_summary | Module-level semantic matching | text description of module responsibility |
 | doc.summary | Document-level fine-grained matching | text description of specific document content |
 
@@ -21,7 +21,7 @@ Before diving into the filtering levels, it is important to understand the three
 **Purpose**: Definitive hard filter using glob patterns
 
 **Process**:
-1. Extract all `code_paths` from graph.json for the relevant module
+1. Extract all `code_paths` from `docs/graph.json` for the relevant module
 2. For each changed file in the diff, test against each glob pattern
 3. If any changed file matches any `code_paths` pattern, the module is considered relevant
 4. If no files match, discard the entire module (no further levels executed)
@@ -59,7 +59,7 @@ Before diving into the filtering levels, it is important to understand the three
 **Purpose**: Determine if the diff is semantically related to the module's core responsibility
 
 **Process**:
-1. Retrieve `module_summary` from graph.json for the candidate module
+1. Retrieve `module_summary` from `docs/graph.json` for the candidate module
 2. Compare the diff summary (from Level 1) against the module_summary
 3. Use semantic similarity to score the relationship
 4. If similarity is above threshold, proceed to Level 3
@@ -82,7 +82,7 @@ Before diving into the filtering levels, it is important to understand the three
 
 **Process**:
 1. For each document type in the module (design, api, user, etc.)
-2. Retrieve the `doc.summary` field from graph.json
+2. Retrieve the `doc.summary` field from `docs/graph.json`
 3. Compare the diff summary against each doc.summary
 4. Calculate per-document impact scores
 
@@ -150,3 +150,31 @@ These thresholds can be adjusted based on:
 - Size of the codebase
 - Number of documents
 - Tolerance for missed updates (recall) vs false positives (precision)
+
+## Git-History Batch Mode Considerations
+
+When using git-history-based batch analysis (via `_meta.lastDocSyncRef`), the filtering strategy operates with some key differences:
+
+### Pre-filtering by Diff Scope
+
+The `git diff <ref>..HEAD -- ':(exclude)docs/**'` command already excludes documentation files from the diff. This means:
+
+- **Level 0 (Path Matching)** remains fully valid and is the primary filter for narrowing which modules are affected
+- The input to Level 0 is already scoped to code-only changes, reducing noise
+- Modules with `code_paths: []` (e.g., plans, integration) will always be excluded from batch analysis since they have no code to diff against
+
+### Large Diff Handling Strategy
+
+| Scale | Files Changed | Strategy |
+|-------|--------------|----------|
+| Small | < 20 files | Process directly — run Level 0 through Level 3 on the full diff |
+| Medium | 20-50 files | Group changed files by top-level directory, process each group sequentially to control context window usage |
+| Large | > 50 files | Run `git diff --stat` first to identify hotspots, then apply Level 0 per directory before combining results |
+
+### Batch-Specific Optimizations
+
+1. **Directory-level grouping**: For medium/large diffs, group files by their parent directory before Level 0 matching. This allows batch-matching against `code_paths` globs more efficiently.
+
+2. **Commits within range**: Use `git log --oneline <ref>..HEAD -- ':(exclude)docs/**'` to provide a summary of code changes for the diff summary (Level 1), giving broader context than a single diff.
+
+3. **Skip non-code modules**: Modules with empty `code_paths` can be immediately skipped in batch mode since they have no code footprint to match against.

@@ -15,6 +15,7 @@ Context-Aware Documentation Maintenance Pipeline (基于语义索引的文档自
 2. 需要根据 git diff 识别受影响的文档
 3. 需要通过 intent 查询相关文档和 anchor
 4. 需要维护文档与代码的长期同步
+5. 需要检查文档与近期代码变更的同步状态 (git-history doc sync)
 
 ## 工作流程编排
 
@@ -41,6 +42,34 @@ doc.update      建议 doc.gen     忽略        doc.index
 | high | 明确影响 | 自动触发 doc.update |
 | medium | 可能影响 | 建议 doc.gen（补全或重构） |
 | low | 无影响 | 忽略，无需操作 |
+
+### Git-History Doc Sync Workflow
+
+When triggered with `--sync`, doc-evolution performs a complete documentation synchronization based on git history:
+
+```
+Step 1: Read _meta.lastDocSyncRef from graph.json
+          │
+          ├─ Missing/invalid → fallback: git log --format="%H" -1 -- docs/
+          └─ Valid → use as sync reference
+          │
+Step 2: git diff <ref>..HEAD -- ':(exclude)docs/**'
+          │
+          ├─ Empty → report "no code changes since last sync", exit
+          └─ Non-empty → continue
+          │
+Step 3: Run doc.check two-phase analysis on the diff
+          │
+Step 4: Process decisions by certainty
+          │
+Step 5: Update graph.json signatures via doc.index
+          │
+Step 6: Write new _meta.lastDocSyncRef = HEAD hash
+```
+
+**Sync modes:**
+- `--sync` — Full sync: analyze, update docs, refresh index, write sync ref
+- `--sync --check-only` — Check only: analyze and report, do not update docs or write sync ref
 
 ## 子 skill 调用规则
 
@@ -109,6 +138,11 @@ doc.index --update --path <文档路径>
 - Docs to review (medium): <数量>
 - Docs ignored (low): <数量>
 
+### Sync Info
+- Sync reference: <ref>
+- Commits since sync: <count>
+- Files changed since sync: <count>
+
 ### Detailed Decisions
 | Module | Doc Type | Decision | Certainty | Reason |
 |--------|----------|----------|-----------|--------|
@@ -132,6 +166,16 @@ doc.index --update --path <文档路径>
 ## 调用示例
 
 ### 完整流程
+
+```bash
+# Git-history sync (full synchronization)
+doc-evolution --sync
+
+# Git-history sync (check only, no updates)
+doc-evolution --sync --check-only
+```
+
+### Standard Flow
 
 ```bash
 # 1. 代码变更后触发分析

@@ -10,18 +10,18 @@ This document defines the complete schema for `graph.json` and guidelines for wr
 
 ```json
 {
-  "$schema": "doc-index/graph-schema",
-  "version": "1.0",
-  "modules": {
-    "<module_name>": {
-      "code_paths": ["string"],
-      "module_summary": "string",
-      "docs": {
-        "<doc_type>": {
-          "path": "string",
-          "summary": "string",
-          "status": "up_to_date | outdated | missing | link_only"
-        }
+  "_meta": {
+    "lastDocSyncRef": "string (16-char short git hash)"
+  },
+  "<module_name>": {
+    "code_paths": ["string"],
+    "module_summary": "string",
+    "docs": {
+      "<doc_type>": {
+        "path": "string",
+        "summary": "string",
+        "signature": "string",
+        "status": "up_to_date | outdated | missing | link_only"
       }
     }
   }
@@ -30,7 +30,21 @@ This document defines the complete schema for `graph.json` and guidelines for wr
 
 ### Field Specifications
 
-#### modules
+#### _meta
+- **Type:** Object
+- **Required:** No (defaults to empty object)
+- **Description:** Top-level metadata container for the index, prefixed with `_` to distinguish from module entries
+
+#### _meta.lastDocSyncRef
+- **Type:** String
+- **Required:** No
+- **Length:** Exactly 16 hex characters
+- **Format:** Short git commit hash, computed via `git rev-parse --short=16 HEAD`
+- **Purpose:** Records the git commit at which documentation was last fully synced, enabling automatic diff range calculation for batch analysis
+- **Update rule:** Set to HEAD hash after doc-sync workflow completes
+- **Fallback:** When missing or invalid, use `git log --format="%H" -1 -- docs/` to find the last docs commit
+
+#### module_name (key)
 - **Type:** Object
 - **Required:** Yes
 - **Description:** Container for all module entries
@@ -90,6 +104,20 @@ This document defines the complete schema for `graph.json` and guidelines for wr
 - **Max Length:** 120 characters
 - **Format:** `[Action] + [Scope] + [Key Concepts]`
 
+#### docs[doc_type].signature
+- **Type:** String
+- **Required:** Yes
+- **Length:** Exactly 16 hex characters
+- **Algorithm:** First 16 characters of SHA-256 digest of the full file content
+- **Computation:** `sha256sum <file_path> | cut -c1-16`
+- **Purpose:** Content fingerprint for change detection — enables index validation without loading document content
+- **Update rule:** MUST be recomputed and stored whenever the document file is modified
+- **Examples:**
+  ```json
+  "signature": "9c50d387e41921e9"
+  "signature": "17abda0ea945b63b"
+  ```
+
 #### docs[doc_type].status
 - **Type:** String
 - **Required:** No (defaults to "up_to_date")
@@ -103,21 +131,27 @@ This document defines the complete schema for `graph.json` and guidelines for wr
 
 ```json
 {
+  "_meta": {
+    "lastDocSyncRef": "9c50d387e41921e9"
+  },
   "auth": {
     "code_paths": ["src/modules/auth/**"],
     "module_summary": "Authentication subsystem responsible for identity verification, token lifecycle, and OAuth integration.",
     "docs": {
       "design": {
         "path": "docs/design/modules/auth/index.md",
-        "summary": "Describes authentication mechanisms including login flows, token lifecycle, and OAuth integration."
+        "summary": "Describes authentication mechanisms including login flows, token lifecycle, and OAuth integration.",
+        "signature": "a1b2c3d4e5f6a7b8"
       },
       "api": {
         "path": "docs/api/rest/auth.md",
-        "summary": "Defines authentication endpoints such as login, logout, token refresh, and OAuth callbacks."
+        "summary": "Defines authentication endpoints such as login, logout, token refresh, and OAuth callbacks.",
+        "signature": "b2c3d4e5f6a7b8c9"
       },
       "user": {
         "path": "docs/user/auth.md",
-        "summary": "Explains how users sign in, manage sessions, and use third-party login options."
+        "summary": "Explains how users sign in, manage sessions, and use third-party login options.",
+        "signature": "c3d4e5f6a7b8c9d0"
       }
     }
   },
@@ -127,15 +161,18 @@ This document defines the complete schema for `graph.json` and guidelines for wr
     "docs": {
       "design": {
         "path": "docs/design/modules/payments/index.md",
-        "summary": "Explains payment architecture including transaction flow, refund handling, and subscription billing."
+        "summary": "Explains payment architecture including transaction flow, refund handling, and subscription billing.",
+        "signature": "d4e5f6a7b8c9d0e1"
       },
       "api": {
         "path": "docs/api/rest/payments.md",
-        "summary": "Documents payment endpoints for charging, refunds, subscriptions, and payment method operations."
+        "summary": "Documents payment endpoints for charging, refunds, subscriptions, and payment method operations.",
+        "signature": "e5f6a7b8c9d0e1f2"
       },
       "user": {
         "path": "docs/user/payments.md",
-        "summary": "Guides users through payment setup, transaction history, and refund requests."
+        "summary": "Guides users through payment setup, transaction history, and refund requests.",
+        "signature": "f6a7b8c9d0e1f2a3"
       }
     }
   }
@@ -219,14 +256,22 @@ Describes how to create projects, invite team members, and manage access permiss
 
 ## Status Reporting
 
-### Status Calculation Logic
+### Status Calculation Logic (Signature-Driven)
 
-| Condition | Status |
-|-----------|--------|
-| File exists + summary is current + matches code | `up_to_date` |
-| File exists + but code has changed significantly | `outdated` |
-| Path exists in graph.json but file missing | `missing` |
-| Only link/placeholder content | `link_only` |
+| Step | Check | Result |
+|------|-------|--------|
+| 1 | Does `doc.path` file exist? | `missing` if NO |
+| 2 | Compute current SHA-256 (first 16 chars) | proceed |
+| 3 | Compare with stored `doc.signature` | proceed |
+| 4a | Signatures MATCH | `up_to_date` |
+| 4b | Signatures MISMATCH | `outdated` — doc changed, summary may be stale |
+| 4c | No `signature` field in graph.json | `outdated` — index pre-dates signature feature |
+
+**Recovery for `outdated`:**
+1. Re-read the document
+2. Check if summary still reflects document content
+3. If summary valid → update `signature` only
+4. If summary stale → update both `summary` and `signature`
 
 ### index.md Output Format
 
