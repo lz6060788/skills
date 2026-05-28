@@ -1,0 +1,25 @@
+{
+  "name": "relax-doc",
+  "owner": {
+    "name": "irises",
+    "email": "ir1seswhite@gmail.com"
+  },
+  "metadata": {
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "relax-doc",
+      "manifest": "../relax-doc/manifest.json",
+      "source": "../relax-doc/",
+      "description": "文档工程，用于管理更新项目文档",
+      "category": "documentation",
+      "keywords": [
+        "code",
+        "docs",
+        "relax"
+      ],
+      "tags": ["chinese", "markdown", "project", "harness"]
+    }
+  ]
+}
